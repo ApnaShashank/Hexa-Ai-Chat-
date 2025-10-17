@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chat With Hexa</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #111827;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #374151;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4b5563;
+        }
+        .prose pre {
+            background-color: #1f2937;
+            color: #d1d5db;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            position: relative;
+        }
+        .prose code {
+            font-family: 'Courier New', Courier, monospace;
+        }
+        .copy-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background-color: #4b5563;
+            color: #e5e7eb;
+            border: none;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            font-size: 0.75rem;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        pre:hover .copy-btn {
+            opacity: 1;
+        }
+
+        #prompt-input:hover {
+            box-shadow: 5px 0px 10px rgba(199, 201, 203, 0.5);
+            
+        }
+
+
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200">
+
+    <div id="app-container" class="flex flex-col h-screen">
+
+        
+        <header class="bg-gray-800/50 backdrop-blur-sm border-b border-gray-700 p-3 flex items-center justify-center shadow-lg fixed top-0 left-0 right-0 z-10">
+            <h1 class="text-xl font-bold text-white">Hexa AI Chat</h1>
+        </header>
+
+        <main id="chat-container" class="flex-1 overflow-y-auto p-6 pt-24 pb-28">
+            
+            <div class="message model-message max-w-3xl">
+                <div class="bg-gray-800 rounded-xl p-4 prose prose-invert max-w-none">
+                    <p>Namaste! Main aapka AI HEXA hoon. Shuru karne ke liye neeche ek sandesh likhein.</p>
+                </div>
+            </div>
+        </main>
+
+        <footer class="fixed bottom-0 left-0 right-0 bg-gray-900 bg-opacity-80 backdrop-blur-sm p-4 border-t border-gray-700">
+            <form id="chat-form" class="max-w-4xl mx-auto flex items-end gap-3">
+                <textarea id="prompt-input" placeholder="Type here..........." class="flex-1 bg-gray-800 border border-gray-700 rounded-xl p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow duration-300 shadow-sm" rows="1"></textarea>
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white rounded-xl p-3 h-12 w-12 flex items-center justify-center transition disabled:bg-gray-600 disabled:cursor-not-allowed">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0
+ 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-send"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                </button>
+            </form>
+        </footer>
+
+    </div>
+
+    <script>
+        const chatContainer = document.getElementById('chat-container');
+        const chatForm = document.getElementById('chat-form');
+        const promptInput = document.getElementById('prompt-input');
+        const sendBtn = chatForm.querySelector('button');
+
+        const apiKey = "AIzaSyBgAxm8Kr2P7UVNMkre8frqdys_bRJ23nk";
+
+        let conversationHistory = [];
+
+        chatForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const prompt = promptInput.value.trim();
+            if (prompt) {
+                promptInput.value = '';
+                adjustTextareaHeight();
+                sendMessage(prompt);
+            }
+        });
+
+        promptInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                chatForm.requestSubmit();
+            }
+        });
+        
+        promptInput.addEventListener('input', adjustTextareaHeight);
+
+        function adjustTextareaHeight() {
+            promptInput.style.height = 'auto';
+            promptInput.style.height = (promptInput.scrollHeight) + 'px';
+        }
+
+        function displayMessage(role, content) {
+            const messageWrapper = document.createElement('div');
+            messageWrapper.className = `message ${role}-message flex mb-4 ${role === 'user' ? 'justify-end' : 'justify-start'}`;
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `rounded-xl p-4 max-w-3xl ${role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-200'}`;
+
+            if (role === 'model') {
+                messageDiv.innerHTML = marked.parse(content);
+                messageDiv.querySelectorAll('pre code').forEach((block) => {
+                    hljs.highlightElement(block);
+                    const pre = block.parentElement;
+                    const copyBtn = document.createElement('button');
+                    copyBtn.className = 'copy-btn';
+                    copyBtn.textContent = 'Copy';
+                    pre.appendChild(copyBtn);
+                });
+            } else {
+                const p = document.createElement('p');
+                p.textContent = content;
+                messageDiv.appendChild(p);
+            }
+
+            messageWrapper.appendChild(messageDiv);
+            chatContainer.appendChild(messageWrapper);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function showTypingIndicator() {
+            const indicator = document.createElement('div');
+            indicator.id = 'typing-indicator';
+            indicator.className = 'message model-message flex mb-4 justify-start';
+            indicator.innerHTML = `
+                <div class="rounded-xl p-4 bg-gray-800 text-gray-400">
+                    <div class="flex items-center gap-2">
+                        <div class="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                        <div class="w-2 h-2 bg-blue-400 rounded-full animate-pulse" style="animation-delay: 0.2s;"></div>
+                        <div class="w-2 h-2 bg-blue-400 rounded-full animate-pulse" style="animation-delay: 0.4s;"></div>
+                    </div>
+                </div>
+            `;
+            chatContainer.appendChild(indicator);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function removeTypingIndicator() {
+            const indicator = document.getElementById('typing-indicator');
+            if (indicator) {
+                indicator.remove();
+            }
+        }
+
+        async function sendMessage(prompt) {
+            if (!apiKey || apiKey === "YOUR_GEMINI_API_KEY_HERE") {
+                displayMessage('model', 'Kripya pehle code mein apna Gemini API key daalein.');
+                return;
+            }
+
+            displayMessage('user', prompt);
+            showTypingIndicator();
+            sendBtn.disabled = true;
+
+            conversationHistory.push({ role: 'user', parts: [{ text: prompt }] });
+
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        contents: conversationHistory,
+                        safetySettings: [
+                            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+                        ],
+                    }),
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error.message || `API Request Failed with status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                removeTypingIndicator();
+
+                if (data.candidates && data.candidates.length > 0 && data.candidates[0].content.parts) {
+                    const modelResponse = data.candidates[0].content.parts[0].text;
+                    displayMessage('model', modelResponse);
+                    conversationHistory.push({ role: 'model', parts: [{ text: modelResponse }] });
+                } else {
+                    displayMessage('model', 'Maaf kijiye, AI se koi jawab nahi mila. Kripya dobara koshish karein.');
+                }
+
+            } catch (error) {
+                removeTypingIndicator();
+                console.error('Error:', error);
+                displayMessage('model', `Ek error aa gayi: ${error.message}. Kripya apna API key aur internet connection check karein.`);
+            } finally {
+                sendBtn.disabled = false;
+                promptInput.focus();
+            }
+        }
+        
+        chatContainer.addEventListener('click', (e) => {
+            if (e.target.classList.contains('copy-btn')) {
+                const pre = e.target.parentElement;
+                const code = pre.querySelector('code');
+                navigator.clipboard.writeText(code.innerText).then(() => {
+                    e.target.textContent = 'Copied!';
+                    setTimeout(() => {
+                        e.target.textContent = 'Copy';
+                    }, 2000);
+                });
+            }
+        });
+
+        adjustTextareaHeight();
+    </script>
+</body>
+</html>
